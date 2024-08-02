@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aero-sensor-broker-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aero-sensor-broker
+  template:
+    metadata:
+      labels:
+        app: aero-sensor-broker
+    spec:
+      containers:
+      - name: aero-sensor-broker
+        image: ghcr.io/suse-south-emea/aero-sensor-broker:0.1
+        volumeMounts:
+        - name: config-volume
+          mountPath: /settings
+          readOnly: true
+        - name: dev-volume
+          mountPath: /dev
+        - name: run-udev-volume
+          mountPath: /run/udev
+        resources:
+          limits:
+            akri.sh/akri-udev: "1"
+          requests:
+            akri.sh/akri-udev: "1"
+        ports:
+          - containerPort: 3030
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 3030
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 3030
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      volumes:
+      - name: config-volume
+        secret:
+          secretName: influxdb-aero-sensor-config
+      - name: dev-volume
+        hostPath:
+          path: /dev
+          type: Directory
+      - name: run-udev-volume
+        hostPath:
+          path: /run/udev
+          type: Directory
