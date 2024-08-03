@@ -51,18 +51,18 @@ Before deploying, ensure the `Settings.toml` configuration file is correctly set
 
 ### Kubernetes Deployment
 
-Deploy the application within a Kubernetes environment using the provided deployment descriptor:
-
-```bash
-$ kubectl apply -f kubernetes/deployment.yaml
-```
-
-This deployment script configures the broker as a Kubernetes Deployment object, ensuring it is deployed with the necessary privileges and resource requests to function correctly. It also sets up readiness and liveness probes to manage the application lifecycle based on its health status.
-
 We will need the application configuration:
 ```bash
 $ kubectl create secret generic influxdb-config --from-file=settings/Settings.toml
 ```
+
+Deploy the application within a Kubernetes environment using the provided deployment descriptor:
+
+```bash
+$ helm install aero-sensor-broker ./kubernetes/helm-chart/
+```
+
+This deployment script configures the broker as a Kubernetes Deployment object, ensuring it is deployed with the necessary privileges and resource requests to function correctly. It also sets up readiness and liveness probes to manage the application lifecycle based on its health status.
 
 ## Health Monitoring
 
