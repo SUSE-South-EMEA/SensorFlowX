@@ -1,0 +1,8 @@
+replicaCount: 1
+image:
+  repository: ghcr.io/suse-south-emea/aero-sensor-broker
+  tag: 0.1
+  pullPolicy: IfNotPresent
+
+# Default environment variable values
+location: "Default"

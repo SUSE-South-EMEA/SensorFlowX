@@ -1,0 +1,4 @@
+apiVersion: v2
+name: aero-sensor-broker-chart
+description: A Helm chart for Aero Sensor Broker with dynamic location 
+version: 0.1.0

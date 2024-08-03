@@ -1,0 +1,7 @@
+defaultNamespace: default
+helm:
+  chart: ./helm-chart
+  releaseName: aero-sensor-broker
+  version: "0.1.0"
+  values:
+    location: global.fleet.clusterLabels.management.cattle.io/cluster-display-name

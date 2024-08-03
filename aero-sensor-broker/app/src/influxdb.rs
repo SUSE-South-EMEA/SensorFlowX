@@ -76,7 +76,7 @@ impl InfluxDBManager {
 }
 
 // Parses sensor data from a formatted string and creates a set of data points for InfluxDB.
-pub fn parse_sensor_data(input: String) -> Result<Vec<DataPoint>, Box<dyn Error + Send + Sync>> {
+pub fn parse_sensor_data(input: String, location: &str) -> Result<Vec<DataPoint>, Box<dyn Error + Send + Sync>> {
     // Sanitize and split the input data.
     let parts: Vec<f64> = input
         .trim()
@@ -96,14 +96,17 @@ pub fn parse_sensor_data(input: String) -> Result<Vec<DataPoint>, Box<dyn Error 
             let timestamp = Utc::now().timestamp_nanos_opt().unwrap();
             let points = vec![
                 DataPoint::builder("temperature")
+                    .tag("location", location)
                     .field("value", *temperature)
                     .timestamp(timestamp)
                     .build()?,
                 DataPoint::builder("humidity")
+                    .tag("location", location)
                     .field("value", *humidity)
                     .timestamp(timestamp)
                     .build()?,
                 DataPoint::builder("air_quality")
+                    .tag("location", location)
                     .field("value", *air_quality)
                     .timestamp(timestamp)
                     .build()?,

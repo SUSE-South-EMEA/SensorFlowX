@@ -1,20 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: aero-sensor-broker-deployment
+  name: {{ .Release.Name }}-deployment
+  labels:
+    app: {{ .Release.Name }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: aero-sensor-broker
+      app: {{ .Release.Name }}
   template:
     metadata:
       labels:
-        app: aero-sensor-broker
+        app: {{ .Release.Name }}
     spec:
       containers:
       - name: aero-sensor-broker
-        image: ghcr.io/suse-south-emea/aero-sensor-broker:0.1
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
         volumeMounts:
         - name: config-volume
           mountPath: /settings
@@ -28,6 +31,9 @@ spec:
             akri.sh/akri-udev: "1"
           requests:
             akri.sh/akri-udev: "1"
+        env:
+        - name: CLUSTER_DISPLAY_NAME
+          value: {{ .Values.location }}
         ports:
           - containerPort: 3030
         livenessProbe:

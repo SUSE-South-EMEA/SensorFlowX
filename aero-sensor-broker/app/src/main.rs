@@ -18,6 +18,7 @@ use influxdb::InfluxDBManager;
 use routes::create_health_route;
 
 use std::error::Error;
+use std::env;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
@@ -75,6 +76,15 @@ async fn run_serial_to_influx_loop(
     influxdb_manager: InfluxDBManager,
     bucket: &str,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
+    // Retrieve the environment variable `CLUSTER_DISPLAY_NAME` and use it as a location
+    let location = match env::var("CLUSTER_DISPLAY_NAME") {
+        Ok(value) => value,
+        Err(e) => {
+            println!("Couldn't read CLUSTER_DISPLAY_NAME: {}", e);
+            String::from("Default")
+        }
+    };
+
     loop {
         let data = arduino_manager
             .lock()
@@ -86,7 +96,7 @@ async fn run_serial_to_influx_loop(
                 e
             })?;
 
-        let points = parse_sensor_data(data).map_err(|e| {
+        let points = parse_sensor_data(data, &location).map_err(|e| {
             error!("Failed to parse sensor data: {}", e);
             e
         })?;
