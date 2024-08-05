@@ -1,9 +1,10 @@
 [package]
 name = "aero-sensor-broker"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 [dependencies]
+async-trait = "0.1.81"
 serialport = "4.4"
 tokio = { version = "1.39.1", features = ["full"] }
 influxdb2 = "0.5.2"

@@ -13,14 +13,12 @@ use influxdb2::{
     Client,
 };
 use std::error::Error;
-use std::sync::Arc;
-use tokio::sync::Mutex;
 
 use log::{debug, error, info};
 
 #[derive(Clone)]
 pub struct InfluxDBManager {
-    pub client: Arc<Mutex<Client>>,
+    pub client: Client,
 }
 
 impl InfluxDBManager {
@@ -29,14 +27,13 @@ impl InfluxDBManager {
         let client = Client::new(&config.url, &config.org, &config.auth_token);
         info!("New InfluxDB client created for URL: {}", &config.url);
         Ok(Self {
-            client: Arc::new(Mutex::new(client)),
+            client: client,
         })
     }
 
     // Checks the health of the InfluxDB connection and handles any connectivity issues.
     pub async fn check_health(&self) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let client = self.client.lock().await;
-        match client.health().await {
+        match self.client.health().await {
             Ok(health) if health.status == Status::Pass => {
                 info!("InfluxDB health check successful");
                 Ok(())
@@ -59,10 +56,8 @@ impl InfluxDBManager {
         bucket: &str,
         points: Vec<DataPoint>,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let client = self.client.lock().await;
-
         // Attempt to write data points to InfluxDB
-        match client.write(bucket, futures::stream::iter(points)).await {
+        match self.client.write(bucket, futures::stream::iter(points)).await {
             Ok(_) => {
                 debug!("Data written to InfluxDB successfully");
                 Ok(())
@@ -76,7 +71,10 @@ impl InfluxDBManager {
 }
 
 // Parses sensor data from a formatted string and creates a set of data points for InfluxDB.
-pub fn parse_sensor_data(input: String, location: &str) -> Result<Vec<DataPoint>, Box<dyn Error + Send + Sync>> {
+pub fn parse_sensor_data(
+    input: String,
+    location: &str,
+) -> Result<Vec<DataPoint>, Box<dyn Error + Send + Sync>> {
     // Sanitize and split the input data.
     let parts: Vec<f64> = input
         .trim()

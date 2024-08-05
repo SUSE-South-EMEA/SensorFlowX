@@ -16,6 +16,7 @@ use tokio::time::{sleep, Duration};
 
 use log::{debug, error, info, warn};
 
+#[derive(Clone)]
 pub struct ArduinoManager {
     pub port: Arc<Mutex<Box<dyn SerialPort + Send>>>,
 }

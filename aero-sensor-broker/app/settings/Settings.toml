@@ -1,5 +1,5 @@
 [influxdb]
-url = "http://influxdb:80"
+url = "http://localhost:8086"
 bucket = "sensor_data"
 org = "influxdata"
 auth_token = "token"
