@@ -8,16 +8,17 @@
 mod arduino;
 mod cache;
 mod config;
-mod errors;
+mod data_manipulation;
 mod influxdb;
 mod routes;
 
-use cache::Cache;
 use arduino::ArduinoManager;
-use influxdb::InfluxDBManager;
-use influxdb::parse_sensor_data;
-use routes::create_health_route;
+use cache::Cache;
+use chrono::Utc;
 use config::load_settings;
+use data_manipulation::{calculate_average, parse_sensor_data};
+use influxdb::InfluxDBManager;
+use routes::create_health_route;
 
 use std::env;
 use std::error::Error;
@@ -36,20 +37,18 @@ async fn main() {
     });
 
     // Setup ArduinoManager with settings from the config
-    let arduino_manager = 
-        ArduinoManager::new(&settings.arduino).unwrap_or_else(|e| {
-            error!("Failed to initialize ArduinoManager: {}", e);
-            std::process::exit(1);
+    let arduino_manager = ArduinoManager::new(&settings.arduino).unwrap_or_else(|e| {
+        error!("Failed to initialize ArduinoManager: {}", e);
+        std::process::exit(1);
     });
 
     // Initialize Cache
     let cache = Cache::new(1000);
 
     // Setup InfluxDBManager with settings from the config
-    let influxdb_manager = 
-        InfluxDBManager::new(&settings.influxdb).unwrap_or_else(|e| {
-            error!("Failed to initialize InfluxDBManager: {}", e);
-            std::process::exit(1);
+    let influxdb_manager = InfluxDBManager::new(&settings.influxdb).unwrap_or_else(|e| {
+        error!("Failed to initialize InfluxDBManager: {}", e);
+        std::process::exit(1);
     });
 
     // Initialize the HTTP server for health checks
@@ -58,19 +57,18 @@ async fn main() {
         warp::serve(health_route).run(([0, 0, 0, 0], 3030)).await;
     });
 
-
     // Spawn a task for periodic cache flush to InfluxDB
-    tokio::spawn( {
+    tokio::spawn({
         let cache_to_flush = cache.clone();
         let influxdb_manager_to_flush = influxdb_manager.clone();
         async move {
-        cache_to_flush
-            .periodic_flush(
-                influxdb_manager_to_flush,
-                &settings.influxdb.bucket,
-                Duration::from_secs(60),
-            )
-            .await;
+            cache_to_flush
+                .periodic_flush(
+                    influxdb_manager_to_flush,
+                    &settings.influxdb.bucket,
+                    Duration::from_secs(60),
+                )
+                .await;
         }
     });
 
@@ -90,21 +88,29 @@ async fn run_serial_to_influx_loop(
         String::from("Default")
     });
 
-    loop {
-        let data = arduino_manager
-            .read_data()
-            .await
-            .map_err(|e| {
-                error!("Failed to read data from Arduino: {}", e);
-                e
-            })?;
+    let mut previous_timestamp = Utc::now().timestamp();
+    let mut points = Vec::new();
 
-        let points = parse_sensor_data(data, &location).map_err(|e| {
+    loop {
+        let data = arduino_manager.read_data().await.map_err(|e| {
+            error!("Failed to read data from Arduino: {}", e);
+            e
+        })?;
+
+        let new_points = parse_sensor_data(data, &location).map_err(|e| {
             error!("Failed to parse sensor data: {}", e);
             e
         })?;
 
-        cache.add(points).await;
+        points.extend(new_points);
+
+        let timestamp = Utc::now().timestamp();
+
+        if (timestamp - previous_timestamp) > 60 {
+            previous_timestamp = Utc::now().timestamp();
+            cache.add(calculate_average(points)).await;
+            points = Vec::new();
+        }
 
         debug!("Data processed successfully.");
         sleep(Duration::from_millis(1000)).await;

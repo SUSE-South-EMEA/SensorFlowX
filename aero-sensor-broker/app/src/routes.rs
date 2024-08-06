@@ -12,7 +12,7 @@ use warp::{reply, Filter};
 // Creates an HTTP route for health checks.
 pub fn create_health_route(
     arduino_manager: ArduinoManager,
-    influxdb_manager:InfluxDBManager,
+    influxdb_manager: InfluxDBManager,
 ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::path!("healthz")
         .and(warp::get())
@@ -23,15 +23,13 @@ pub fn create_health_route(
 
 fn with_arduino_manager(
     arduino_manager: ArduinoManager,
-) -> impl Filter<Extract = (ArduinoManager,), Error = std::convert::Infallible> + Clone
-{
+) -> impl Filter<Extract = (ArduinoManager,), Error = std::convert::Infallible> + Clone {
     warp::any().map(move || arduino_manager.clone())
 }
 
 fn with_influxdb_manager(
     influxdb_manager: InfluxDBManager,
-) -> impl Filter<Extract = (InfluxDBManager,), Error = std::convert::Infallible> + Clone
-{
+) -> impl Filter<Extract = (InfluxDBManager,), Error = std::convert::Infallible> + Clone {
     warp::any().map(move || influxdb_manager.clone())
 }
 

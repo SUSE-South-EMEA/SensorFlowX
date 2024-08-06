@@ -1,14 +1,18 @@
 // cache.rs
 
-use crate::influxdb::InfluxDBManager;
+// This module defines a `Cache` struct for managing a collection of `DataPoint` instances
+// in a thread-safe manner. The cache supports adding new data points, periodically flushing
+// the cached data to an InfluxDB instance, and maintaining a maximum cache size.
+// It uses an asynchronous approach to handle operations in a non-blocking way, suitable for
+// concurrent environments.
 
+use crate::influxdb::InfluxDBManager;
 use influxdb2::models::DataPoint;
+use log::{debug, error};
 use std::collections::VecDeque;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
-
-use log::{debug, error};
 
 #[derive(Clone)]
 pub struct Cache {
@@ -17,6 +21,7 @@ pub struct Cache {
 }
 
 impl Cache {
+    // Creates a new Cache instance with a specified maximum size
     pub fn new(max_size: usize) -> Self {
         Self {
             inner: Arc::new(Mutex::new(VecDeque::new())),
@@ -24,7 +29,7 @@ impl Cache {
         }
     }
 
-    // Add data to the cache
+    // Adds a collection of data points to the cache
     pub async fn add(&self, data_points: Vec<DataPoint>) {
         debug!("Adding {:?} data points to cache", data_points);
         let mut cache = self.inner.lock().await;
@@ -34,21 +39,16 @@ impl Cache {
             cache.pop_front();
         }
 
-        // Add new data points to the cache
+        // Add new data points to the end of the cache
         cache.extend(data_points.clone());
     }
 
-    // Retrieve all cached data and clear the cache
+    // Retrieves all cached data points and clears the cache
     pub async fn retrieve_and_clear(&self) -> Vec<DataPoint> {
-        self.inner.lock().await.drain(..).collect() // Drains all elements and returns them as Vec
+        self.inner.lock().await.drain(..).collect()
     }
 
-    // Check if cache is empty
-    pub async fn is_empty(&self) -> bool {
-        self.inner.lock().await.is_empty()
-    }
-
-    // Periodically flush the cache to InfluxDB
+    // Periodically flushes the cache to InfluxDB
     pub async fn periodic_flush(
         &self,
         influxdb_manager: InfluxDBManager,
@@ -58,14 +58,17 @@ impl Cache {
         loop {
             sleep(interval).await;
 
-            if !self.is_empty().await {
-                let points_to_flush = self.retrieve_and_clear().await;
-                if let Err(e) = influxdb_manager
-                    .write_data(bucket, points_to_flush)
-                    .await
-                {
-                    error!("Failed to flush cache to InfluxDB: {}", e);
-                }
+            // Retrieve and clear the cache
+            let points_to_flush = self.retrieve_and_clear().await;
+
+            // Skip processing if the cache is empty
+            if points_to_flush.is_empty() {
+                continue;
+            }
+
+            // Write data to InfluxDB and handle potential errors
+            if let Err(e) = influxdb_manager.write_data(bucket, points_to_flush).await {
+                error!("Failed to flush cache to InfluxDB: {}", e);
             }
         }
     }

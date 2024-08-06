@@ -5,7 +5,6 @@
 // before it is forwarded to the database.
 
 use crate::config::ArduinoConfig;
-use crate::errors::AppError;
 
 use serialport::{available_ports, SerialPort, SerialPortType};
 use std::error::Error;
@@ -94,7 +93,7 @@ impl ArduinoManager {
             }
             _ => {
                 error!("Health check failed");
-                Err(Box::new(AppError::new("Health check failed")))
+                Err("Health check failed".into())
             }
         }
     }
@@ -104,7 +103,7 @@ fn find_and_validate_arduino(
     config: &ArduinoConfig,
 ) -> Result<Box<dyn SerialPort>, Box<dyn Error + Send + Sync>> {
     let target_product = config.device_name.as_str();
-    let ports = available_ports().map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)?;
+    let ports = available_ports().map_err(|e| Box::<dyn Error + Send + Sync>::from(e))?;
 
     debug!("Available ports: {:?}", ports);
 
@@ -125,7 +124,7 @@ fn find_and_validate_arduino(
         })
         .ok_or_else(|| {
             error!("Arduino not found");
-            Box::new(AppError::new("Arduino not found")) as Box<dyn Error + Send + Sync>
+            Box::new(std::fmt::Error) as Box<dyn Error + Send + Sync>
         })?;
 
     debug!("Arduino found on port: {}", arduino_port.port_name);
@@ -133,7 +132,7 @@ fn find_and_validate_arduino(
     serialport::new(&arduino_port.port_name, config.baud_rate)
         .timeout(Duration::from_millis(config.timeout))
         .open()
-        .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync>)
+        .map_err(|e| e.into())
         .map(|port| {
             debug!("Successfully opened port: {}", arduino_port.port_name);
             port
