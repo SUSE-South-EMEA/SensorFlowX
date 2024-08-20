@@ -30,11 +30,13 @@ This project offers a complete solution for monitoring air quality using an Ardu
    - Akri is required to detect and manage Arduino devices within the Kubernetes cluster.
 
    ```bash
-   helm install akri akri-helm-charts/akri \
+   helm repo add suse-edge https://suse-edge.github.io/charts
+
+   helm install akri suse-edge/akri \
      --set kubernetesDistro=k3s \
      --set udev.discovery.enabled=true \
      --set udev.configuration.enabled=true \
-     --set udev.configuration.discoveryDetails.udevRules[0]='SUBSYSTEM=="tty", ATTRS{manufacturer}=="Arduino", ATTRS{product}=="UNO WiFi R4 CMSIS-DAP"'
+     --set udev.configuration.discoveryDetails.udevRules[0]='SUBSYSTEM=="tty"\, ATTRS{manufacturer}=="Arduino"\, ATTRS{product}=="UNO WiFi R4 CMSIS-DAP"'
    ```
 
 2. **Deploy InfluxDB**:
@@ -61,6 +63,12 @@ This project offers a complete solution for monitoring air quality using an Ardu
      - **Version 0.1**: Basic application.
      - **Version 0.2**: Includes local caching.
      - **Version 0.3**: Includes data aggregation to reduce connectivity requirements.
+
+   Create the influxdb configuration:
+   
+   ```bash
+   kubectl create secret generic influxdb-aero-sensor-config --from-file=settings/Settings.toml
+   ```
 
    You can deploy the desired version using the appropriate tag:
 
