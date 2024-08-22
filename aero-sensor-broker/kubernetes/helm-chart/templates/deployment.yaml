@@ -18,6 +18,8 @@ spec:
       - name: aero-sensor-broker
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
+        securityContext:
+          privileged: true
         volumeMounts:
         - name: config-volume
           mountPath: /settings
