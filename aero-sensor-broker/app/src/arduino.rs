@@ -6,12 +6,15 @@
 
 use crate::config::ArduinoConfig;
 
+use chrono::Utc;
 use serialport::{available_ports, SerialPort, SerialPortType};
 use std::error::Error;
 use std::io::{BufRead, BufReader, Write};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
+
+use serde_json::Value;
 
 use log::{debug, error, info, warn};
 
@@ -29,9 +32,49 @@ impl ArduinoManager {
             "New Arduino serial client created for port: {}",
             port.name().unwrap()
         );
-        Ok(Self {
+
+        let manager = Self {
             port: Arc::new(Mutex::new(port)),
-        })
+        };
+
+        let timestamp_ms = Utc::now().timestamp_millis() as i64;
+
+        // Set the time on the Arduino
+        match manager.set_time(timestamp_ms) {
+            Ok(_) => info!("Successfully set time on Arduino."),
+            Err(e) => {
+                error!("Failed to set time on Arduino: {}", e);
+                return Err(e);
+            }
+        }
+
+        Ok(manager)
+    }
+
+    // Function to set time on Arduino synchronously
+    fn set_time(&self, timestamp: i64) -> Result<(), Box<dyn Error + Send + Sync>> {
+        let mut port = self.port.try_lock().expect("Failed to lock port");
+        // Send the SET_TIME command followed by a newline
+        port.write_all(b"SET_TIME\n")?;
+        port.flush()?; // Ensure the command is sent immediately
+
+        // Convert the timestamp to a string and send it followed by a newline
+        port.write_all(format!("{}\n", timestamp).as_bytes())?;
+        port.flush()?;
+
+        // We wait for a simple acknowledgment from the Arduino.
+        let mut buffer = vec![0; 1024];
+        port.read_exact(&mut buffer)?;
+        let response = String::from_utf8_lossy(&buffer).trim().to_string();
+        debug!("{}", response);
+
+        if response.contains(&format!("New timestamp received and set: {}", timestamp)) {
+            debug!("Timestamp set successfully");
+            Ok(())
+        } else {
+            error!("Failed to set timestamp, received: '{}'", response);
+            Err("Failed to set timestamp".into())
+        }
     }
 
     // Reads data from the Arduino. This function continuously checks for new data,
@@ -73,7 +116,26 @@ impl ArduinoManager {
     }
 
     fn is_valid_data(&self, data: &str) -> bool {
-        data.starts_with('<') && data.ends_with('>')
+        // Try to parse the input string as a JSON array
+        let parsed_data: Result<Value, _> = serde_json::from_str(data);
+
+        match parsed_data {
+            Ok(Value::Array(arr)) => {
+                // Iterate over each item in the array and check its structure
+                for item in arr {
+                    if let Value::Object(obj) = item {
+                        // Check for "type", "value" fields
+                        if !obj.contains_key("type") || !obj.contains_key("value") {
+                            return false;
+                        }
+                    } else {
+                        return false; // Not an object, invalid
+                    }
+                }
+                true // All items are valid
+            }
+            _ => false, // Not a valid JSON array
+        }
     }
 
     pub async fn check_health(&self) -> Result<(), Box<dyn Error + Send + Sync>> {
@@ -88,12 +150,12 @@ impl ArduinoManager {
 
         match buffer.trim() {
             "PONG" => {
-                debug!("Health check successful");
+                info!("Arduino health check successful");
                 Ok(())
             }
             _ => {
-                error!("Health check failed");
-                Err("Health check failed".into())
+                error!("Arduino Health check failed");
+                Err("Arduino Health check failed".into())
             }
         }
     }

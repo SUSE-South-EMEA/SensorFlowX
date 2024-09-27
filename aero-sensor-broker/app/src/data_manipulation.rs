@@ -11,7 +11,8 @@
 
 use chrono::Utc;
 use influxdb2::models::{DataPoint, FieldValue};
-use log::{debug, error, trace};
+use log::{debug, trace};
+use serde_json::Value;
 use std::collections::BTreeMap;
 use std::error::Error;
 
@@ -25,20 +26,6 @@ pub struct MyDataPoint {
 }
 
 impl MyDataPoint {
-    pub fn new(
-        measurement: String,
-        tags: BTreeMap<String, String>,
-        field: FieldValue,
-        timestamp: i64,
-    ) -> Self {
-        Self {
-            measurement,
-            tags,
-            fields: BTreeMap::from([("value".into(), field)]),
-            timestamp: Some(timestamp),
-        }
-    }
-
     pub fn get_measurement(&self) -> &str {
         &self.measurement
     }
@@ -124,7 +111,7 @@ fn create_averaged_data_point(
 ) -> DataPoint {
     let builder = DataPoint::builder(measurement)
         .field("value", average_value)
-        .timestamp(average_timestamp);
+        .timestamp(average_timestamp as i64);
 
     tags.iter()
         .fold(builder, |builder, (key, value)| builder.tag(key, value))
@@ -170,54 +157,29 @@ pub fn parse_sensor_data(
     input: String,
     location: &str,
 ) -> Result<Vec<MyDataPoint>, Box<dyn Error + Send + Sync>> {
-    // Sanitize and split the input data.
-    let parts: Vec<f64> = input
-        .trim()
-        .trim_matches(|c: char| c == '<' || c == '>')
-        .split('|')
-        .map(str::trim)
-        .filter_map(|s| s.parse::<f64>().ok())
-        .collect();
+    let json_data: Value = serde_json::from_str(&input)?;
+    let tags = BTreeMap::from([("location".to_string(), location.to_string())]);
 
-    // Use pattern matching to validate and destructure the parts directly.
-    match parts.as_slice() {
-        [temperature, humidity, air_quality] => {
-            debug!(
-                "Data {}, {}, {} parsed successfully from input: {}",
-                temperature, humidity, air_quality, input
-            );
-            let timestamp = Utc::now().timestamp_nanos_opt().unwrap();
+    let points: Vec<MyDataPoint> = json_data
+        .as_array()
+        .ok_or("Expected a JSON array")?
+        .iter()
+        .map(|item| {
+            let sensor_type = item["type"].as_str().ok_or("Missing 'type' field")?;
+            let value = item["value"].as_f64().ok_or("Invalid 'value' field")?;
+            let timestamp = item
+                .get("timestamp")
+                .and_then(Value::as_i64)
+                .unwrap_or_else(|| Utc::now().timestamp_millis() as i64);
 
-            let tags = BTreeMap::from([("location".into(), location.into())]);
+            Ok(MyDataPoint {
+                measurement: sensor_type.to_string(),
+                tags: tags.clone(),
+                fields: BTreeMap::from([("value".to_string(), FieldValue::from(value))]),
+                timestamp: Some(timestamp),
+            })
+        })
+        .collect::<Result<Vec<_>, Box<dyn Error + Send + Sync>>>()?;
 
-            let points: Vec<MyDataPoint> = vec![
-                MyDataPoint::new(
-                    "temperature".into(),
-                    tags.clone(),
-                    FieldValue::from(*temperature),
-                    timestamp,
-                ),
-                MyDataPoint::new(
-                    "humidity".into(),
-                    tags.clone(),
-                    FieldValue::from(*humidity),
-                    timestamp,
-                ),
-                MyDataPoint::new(
-                    "air_quality".into(),
-                    tags,
-                    FieldValue::from(*air_quality),
-                    timestamp,
-                ),
-            ];
-            Ok(points)
-        }
-        _ => {
-            error!(
-                "Incorrect data format or incomplete data in input: {}",
-                input
-            );
-            Err("Incorrect data format or incomplete data".into())
-        }
-    }
+    Ok(points)
 }

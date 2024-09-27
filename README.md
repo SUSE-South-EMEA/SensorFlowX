@@ -125,6 +125,7 @@ This project offers a complete solution for monitoring air quality using an Ardu
 - **Version 0.1**: Initial deployment with basic sensor data handling.
 - **Version 0.2**: Introduced local data caching to improve reliability in case of network disruptions.
 - **Version 0.3**: Added data aggregation to minimize connectivity requirements, demonstrating the power of edge computing.
+- **Version 1.0**: Managing JSON data structure for generic data
 
 You can switch between these versions by checking out the appropriate git tag and deploying the associated Docker image:
 

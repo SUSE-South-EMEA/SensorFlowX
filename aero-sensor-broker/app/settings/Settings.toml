@@ -1,10 +1,10 @@
 [influxdb]
-url = "http://influxdb:80"
+url = "http://localhost:8086"
 bucket = "sensor_data"
 org = "influxdata"
 auth_token = "token"
 
 [arduino]
-baud_rate = 9600
+baud_rate = 115200
 timeout = 1000
 device_name = "UNO WiFi R4 CMSIS_DAP"

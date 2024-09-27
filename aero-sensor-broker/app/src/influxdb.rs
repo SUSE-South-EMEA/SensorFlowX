@@ -54,7 +54,11 @@ impl InfluxDBManager {
         // Attempt to write data points to InfluxDB
         match self
             .client
-            .write(bucket, futures::stream::iter(points))
+            .write_with_precision(
+                bucket,
+                futures::stream::iter(points),
+                influxdb2::api::write::TimestampPrecision::Milliseconds,
+            )
             .await
         {
             Ok(_) => {
